@@ -1,0 +1,152 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("MYSQL_DATABASE_URL")
+}
+
+//유저 정보 테이블
+model User {
+  id         String   @id @default(cuid())
+  password   String
+  nickname   String
+  auth       String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  isLoggedIn Boolean  @default(false)
+
+  // 1:1
+  estates UserEstate?
+
+  // 1:N
+  coinHolders      CoinHolder[]
+  carOwners        CarOwner[]
+  realEstateOwners RealEstateOwner[]
+}
+
+// 유저 현금 보유 테이블 : 변동빈도가 높을 것으로 판단하여 분리 
+model UserEstate {
+  userId String @id
+  cash   Int
+  user   User   @relation(fields: [userId], references: [id])
+}
+
+// 코인 정보 테이블 : 가격정보는 MonogoDB에서 관리
+model Coin {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String
+  createdAt   DateTime @default(now())
+
+  // 1:N
+  holders CoinHolder[]
+  events  CoinEventList[]
+}
+
+// 부동산 정보 테이블
+model RealEstate {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String
+  price       Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt //가격변동시 업데이트
+
+  // 1:N
+  owners RealEstateOwner[]
+  events RealEstateEventList[]
+}
+
+// 차량 정보 테이블
+model Car {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String
+  price       Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 1:N
+  owners CarOwner[]
+  events CarEventList[]
+}
+
+//코인 보유자 테이블: 미보유시 "count, buyPrice = 0"으로 관리
+model CoinHolder {
+  coinId   Int
+  userId   String
+  count    Int    @default(0)
+  buyPrice Int    @default(0)
+
+  coin Coin @relation(fields: [coinId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@id([coinId, userId]) // 복합키 설정
+}
+
+//차량 보유자 테이블: 미보유시 "buyPrice, isOwned = 0"으로 관리
+model CarOwner {
+  carId    Int
+  userId   String
+  buyPrice Int     @default(0)
+  isOwned  Boolean @default(false)
+
+  car  Car  @relation(fields: [carId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@id([carId, userId])
+}
+
+//부동산 보유자 테이블: 미보유시 "buyPrice, isOwned = 0"으로 관리
+model RealEstateOwner {
+  realEstateId Int
+  userId       String
+  buyPrice     Int     @default(0)
+  isOwned      Boolean @default(false)
+
+  realEstate RealEstate @relation(fields: [realEstateId], references: [id])
+  user       User       @relation(fields: [userId], references: [id])
+
+  @@id([realEstateId, userId])
+}
+
+//차량 이벤트 테이블
+model CarEventList {
+  id          Int      @id @default(autoincrement())
+  carId       Int
+  eventType   String // good(호재), bad(악재), common(일반)
+  description String
+  occurredAt  DateTime @default(now())
+
+  car Car @relation(fields: [carId], references: [id])
+}
+
+//부동산 이벤트 테이블
+model RealEstateEventList {
+  id           Int      @id @default(autoincrement())
+  realEstateId Int
+  eventType    String
+  description  String
+  occurredAt   DateTime @default(now())
+
+  realEstate RealEstate @relation(fields: [realEstateId], references: [id])
+}
+
+//코인 이벤트 테이블
+model CoinEventList {
+  id          Int      @id @default(autoincrement())
+  coinId      Int
+  eventType   String
+  description String
+  occurredAt  DateTime @default(now())
+
+  coin Coin @relation(fields: [coinId], references: [id])
+}
